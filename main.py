@@ -115,6 +115,12 @@ async def poll_thermostat(config: ThermostatConfig) -> None:
             try:
                 if thermostat and thermostat.is_connected:
                     await thermostat.async_disconnect()
+            except EOFError:
+                logging.warning(
+                    "EOFError beim Trennen von %s (%s) – ignoriert",
+                    config.label,
+                    config.address,
+                )
             except Exception:
                 logging.exception(
                     "Verbindung zu %s (%s) konnte nicht sauber getrennt werden",
