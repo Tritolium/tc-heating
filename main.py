@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from bleak import BleakScanner
+from bleak.backends.device import BLEDevice
 from eq3btsmart.thermostat import (
     Eq3CommandException,
     Eq3ConnectionException,
@@ -50,6 +52,16 @@ def load_thermostats() -> list[ThermostatConfig]:
     return thermostats
 
 
+async def resolve_ble_device(config: ThermostatConfig, timeout: float = 10.0) -> BLEDevice:
+    """Find a BLEDevice for the configured address using BleakScanner (as in basic usage docs)."""
+    device = await BleakScanner.find_device_by_address(config.address, timeout=timeout)
+    if device is None:
+        raise Eq3ConnectionException(
+            f"Kein Thermostat unter Adresse {config.address} gefunden"
+        )
+    return BLEDevice(address=device.address, name=config.label, details=device.details)
+
+
 async def poll_thermostat(config: ThermostatConfig) -> None:
     if config.is_dummy:
         while True:
@@ -61,10 +73,15 @@ async def poll_thermostat(config: ThermostatConfig) -> None:
             )
             await asyncio.sleep(POLL_INTERVAL_SECONDS)
 
-    thermostat = Thermostat(config.address)
+    device: BLEDevice | None = None
 
     while True:
+        thermostat: Thermostat | None = None
         try:
+            if device is None:
+                device = await resolve_ble_device(config)
+
+            thermostat = Thermostat(device)
             await thermostat.async_connect()
             status = await thermostat.async_get_status()
             logging.info(
@@ -86,15 +103,17 @@ async def poll_thermostat(config: ThermostatConfig) -> None:
                 config.address,
                 ex,
             )
+            device = None  # rediscover next loop
         except Exception:
             logging.exception(
                 "Unerwarteter Fehler beim Abfragen von %s (%s)",
                 config.label,
                 config.address,
             )
+            device = None
         finally:
             try:
-                if thermostat.is_connected:
+                if thermostat and thermostat.is_connected:
                     await thermostat.async_disconnect()
             except Exception:
                 logging.exception(
