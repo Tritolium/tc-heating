@@ -1,0 +1,11 @@
+aiooui==0.1.9
+bleak==2.1.1
+bleak-retry-connector==4.4.4
+bluetooth-adapters==2.1.1
+construct==2.10.70
+construct-typing==0.7.0
+dbus-fast==3.1.2
+eq3btsmart==2.4.2
+typing_extensions==4.15.0
+uart-devices==0.1.1
+usb-devices==0.4.5
